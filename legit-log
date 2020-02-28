@@ -1,0 +1,17 @@
+#!/bin/dash
+#!/bin/sh
+
+#By Jonathan Williams (z5162987) - July 2019
+
+#error checking: legit initialized, .log file is empty
+if [ ! -d ".legit" ]
+then
+   echo "legit-add: error: no .legit directory containing legit repository exists"
+   exit 1
+elif [ ! -s ".legit/.log" ]
+then
+   echo "legit-log: error: your repository does not have any commits yet"
+   exit 1
+fi
+#show log file
+tac ".legit/.log"

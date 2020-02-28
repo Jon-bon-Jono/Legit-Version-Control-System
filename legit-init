@@ -1,0 +1,15 @@
+#!/bin/dash
+#!/bin/sh
+
+#By Jonathan Williams (z5162987) - July 2019
+
+if [ -d ".legit" ]
+then
+   echo "legit-init: error: .legit already exists"
+   exit 1
+else 
+   mkdir ".legit" 
+   mkdir ".legit/.index"
+   echo "Initialized empty legit repository in .legit"
+fi
+

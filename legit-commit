@@ -1,0 +1,141 @@
+#!/bin/dash
+#!/bin/sh
+
+#By Jonathan Williams (z5162987) - July 2019
+
+#error checking: existence of .legit
+if [ ! -d ".legit" ]
+then
+   echo "legit-commit: error: no .legit directory containing legit repository exists"
+   exit 1
+fi
+
+#check usage errors and process options used
+if [ $# -lt 2 ] 
+then
+   echo "usage: legit-commit [-a] -m commit-message"
+   exit 1
+elif [ $# -eq 2 ]
+then #only the -m option is being used, $2 has the commit message
+   #-m must be first arg
+   [ ! "$*" = "`echo "$*"|egrep '^\-m .*'`" ] && 
+   { echo "usage: legit-commit [-a] -m commit-message"; exit 1; }
+   #-m cannot be immediately followed by another -m
+   [ ! "$*" = "`echo "$*"|egrep -v '^\-m \-m$'`" ] &&
+   { echo "usage: legit-commit [-a] -m commit-message"; exit 1; }
+   #-m cannot be immediately followed by -a
+   [ ! "$*" = "`echo "$*"|egrep -v '^\-m \-a$'`" ] &&
+   { echo "usage: legit-commit [-a] -m commit-message"; exit 1; }
+   #no usage errors - set commit message
+   
+elif [ $# -gt 2 ] #-a option is being used
+then
+   #-m must not be immediately followed by -m or -a
+   [ ! "$*" = "`echo "$*"|egrep -v '\-m (\-a)'`" ] &&
+   { echo "usage: legit-commit [-a] -m commit-message"; exit 1; }
+   
+   #-a must be present, either at the beginning or the end or both
+   [ ! "$*" = "`echo "$*"|egrep '^(\-a )+\-m .*( \-a)*$'`" ] && [ ! "$*" = "`echo "$*"|egrep '^(\-a )*\-m .*( \-a)+$'`" ] &&
+   { echo "usage: legit-commit [-a] -m commit-message"; exit 1; }
+   #set the $a variable
+   a="0"
+fi
+
+#get next commit number
+n=0
+while [ -d ".legit/.$n" ]
+do
+   n=$(($n+1))
+done
+
+#-a OPTION
+#get all tracked filenames and legit-add them 
+if [ $a ] && [ -d ".legit/.0" ]
+then 
+   for file in `cat .legit/.tracked`
+   do
+      cp "$file" ".legit/.index"
+   done
+fi
+
+##checking if nothing to commit
+#if tracked file doesn't exist, touch it
+[ ! -f ".legit/.tracked" ] && { touch ".legit/.tracked"; }
+#if first commit
+if [ $n -eq 0 ]
+then
+   #if index empty, nothing to commit
+   [ ! "$(ls -A ./.legit/.index)" ]  && { echo "nothing to commit"; exit 0; }
+else 
+   #if index empty
+   if [ ! "$(ls -A ./.legit/.index)" ]
+   then
+      #if a file hasn't been removed since last commit, then nothing to commit
+      [ "`cat .legit/.tracked|sort`" = "`ls .legit/.$(($n-1))|sort`" ] && 
+      { echo "nothing to commit"; exit 0; }
+   else
+      #nothing to commit if we are only attempting to commit files that haven't been changed since last commit
+      files_different=0
+      for file in `ls .legit/.index`
+      do
+         [ ! -f ".legit/.$(($n-1))/$file" ] && { files_different=1; break; }
+         `diff ".legit/.index/$file" ".legit/.$(($n-1))/$file" > /dev/null`
+         [ "$?" -ne 0 ] && { files_different=1; }
+      done
+      [ $files_different -eq 0 ] && { echo "nothing to commit"; exit 0; }
+   fi
+
+fi
+
+##extract message from command line arguments
+com_msg=""
+for arg in $*
+do 
+   #don't recognise options as the message
+   if [ ! "$arg" = "`echo "$arg" | egrep '^(\-a)|(\-m)$'`" ]
+   then
+      if [ "$com_msg" = "" ] 
+      then 
+         com_msg="$arg"
+      else 
+         com_msg="$com_msg $arg"
+      fi
+   fi
+done
+
+##COMMIT FILES
+#make current commit directory
+mkdir ".legit/.$n"
+#if first commit, make a log file
+#and make a file with filenames of tracked files
+if [ $n -eq 0 ] 
+then 
+   touch ".legit/.log" 
+   for file in `ls .legit/.index`
+   do
+      echo "$file" >> ".legit/.tracked"
+   done
+#copy all tracked files from previous commit to commit folder n 
+else
+   for file in `cat .legit/.tracked`
+   do
+      cp ".legit/.$(($n-1))/$file" ".legit/.$n"
+   done
+fi
+#move everything from index to commit folder n
+#and add newly tracked files to the tracked file
+for file in `ls .legit/.index`
+do
+   cp ".legit/.index/$file" ".legit/.$n"
+   #only add file to tracked if not already tracked
+   [ ! "$file" =  "`egrep "^$file$" ".legit/.tracked"`" ] && { echo "$file" >> ".legit/.tracked"; }
+done
+
+#write a log entry for this commit
+echo "$n $com_msg" >> ".legit/.log"
+#empty index if it isn't already empty
+[ "$(ls -A ./.legit/.index)" ] && { rm .legit/.index/*; }
+#clear the '.deleted' file if it exists
+[ -f ".legit/.deleted" ] && { `>.legit/.deleted`; }
+#print success message
+echo "Committed as commit $n" 

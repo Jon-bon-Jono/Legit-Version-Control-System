@@ -1,0 +1,72 @@
+#!/bin/dash
+#!/bin/sh
+
+#By Jonathan Williams (z5162987) - July 2019
+
+#standar legit error checking
+[ ! -d ".legit/.0" ] && { echo "legit-status: error: your repository does not have any commits yet"; exit 1; }
+
+#get most recent commit number
+n=-1
+while [ -d ".legit/.$(($n+1))" ]
+do
+   n=$(($n+1))
+done
+
+#set file strings
+cwd_files="`ls`"
+indexed_files="`ls .legit/.index`"
+[ -f ".legit/.tracked" ] && { tracked_files="`cat .legit/.tracked`"; }
+[ -f ".legit/.deleted" ] && { deleted_files="`cat .legit/.deleted`"; }
+
+#combine strings so that one filename is on each line
+cluttered_files="$cwd_files
+$indexed_files
+$tracked_files
+$deleted_files"
+
+#clean up the cluttered files string, remove duplicates
+all_files="`echo "$cluttered_files"|sort|uniq`"
+
+for file in $all_files
+do
+   #if file is in included in the deleted string
+   [ "$file" = "`echo "$deleted_files"|egrep "^$file$"`" ] && { echo "$file - deleted"; continue; }
+   #if file deleted not by use of legit-rm
+   [ "$file" = "`echo "$tracked_files"|egrep "^$file$"`" ] &&
+   [ ! "$file" = "`echo "$cwd_files"|egrep "^$file$"`" ] &&
+   { echo "$file - file deleted"; continue; }
+   #if file is in index and not tracked
+   [ "$file" = "`echo "$indexed_files"|egrep "^$file$"`" ] &&
+   [ ! "$file" = "`echo "$tracked_files"|egrep "^$file$"`" ] &&
+   { echo "$file - added to index"; continue; }
+   #if file in CWD and not tracked
+   [ "$file" = "`echo "$cwd_files"|egrep "^$file$"`" ] &&
+   [ ! "$file" = "`echo "$tracked_files"|egrep "^$file$"`" ] &&
+   { echo "$file - untracked"; continue; }
+   #if file is different to recent commit
+   `diff "$file" ".legit/.$n/$file" > /dev/null`
+   if [ $? -ne 0 ]
+   then
+      #if file is index
+      if [ "$file" = "`echo "$indexed_files"|egrep "^$file$"`" ]
+      then
+         #if file is different to index
+         `diff "$file" ".legit/.index/$file" > /dev/null`
+         [ $? -ne 0 ] && { echo "$file - file changed, different changes staged for commit"; continue; }
+         #else
+         echo "$file - file changed, changes staged for commit"
+         continue
+      fi
+      #else file changed but not in index
+      echo "$file - file changed, changes not staged for commit"
+      continue
+   #file is same as recent commit
+   else
+      echo "$file - same as repo"
+   fi
+done
+
+
+ 
+

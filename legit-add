@@ -1,0 +1,30 @@
+#!/bin/dash
+#!/bin/sh
+
+#By Jonathan Williams (z5162987) - July 2019
+
+#error checking: existence of .legit, usage, all file args exist
+if [ ! -d ".legit" ]
+then
+   echo "legit-add: error: no .legit directory containing legit repository exists"
+   exit 1
+elif [ $# -eq 0 ]
+then
+   echo "usage: legit-add <filenames>"
+   exit 1
+fi   
+
+for file in $@
+do
+   if [ ! -f "$file" ]
+   then
+      echo "legit-add: error: can not open '$file'"
+      exit 1
+   fi
+done
+
+#copy file into index (cp should overwrite exisitng versions of file)
+for file in $@
+do
+   cp "$file" ".legit/.index"
+done

@@ -1,0 +1,252 @@
+#!/bin/dash
+#!/bin/sh
+
+#By Jonathan Williams (z5162987) - July 2019
+
+##FUNCTIONS to handle errors or remove files based on options used
+#given files to be removed and most recent commit number
+#--force
+force_standard() {
+   files=$1
+   recent_commit=$2
+   #check that all files are in the repo
+   for file in $files
+   do
+      if [ ! "$file" = "`cat .legit/.tracked|egrep "^$file$"`" ] && [ ! -f ".legit/.index/$file" ]
+      then
+         echo "legit-rm: error: '$file' is not in the legit repository"
+         exit 1
+      fi
+   done
+   #remove files
+   for file in $files
+   do
+      [ -f ".legit/.index/$file" ] && { rm ".legit/.index/$file"; }
+      [ "$file" = "`cat .legit/.tracked | egrep "^$file$"`" ] && { echo "$file" >> ".legit/.deleted"; }
+      #untrack
+      tracked="`sed "/^$file$/d" .legit/.tracked`"
+      echo "$tracked" > ".legit/.tracked"
+      rm "$file"
+   done
+}
+#no options
+rm_standard() {
+   files=$1
+   recent_commit=$2
+   #check for errors
+   for file in $files
+   do
+      #if the file is not in current directory
+      #if file is not in repo (untracked)
+      if [ ! "$file" = "`cat .legit/.tracked | egrep "^$file$"`" ]
+      then 
+         #if file is staged to commit
+         if [ -f ".legit/.index/$file" ]
+         then 
+            #if file has changed since it was staged to commit
+            #doesn't work
+            `diff "$file" ".legit/.index/$file" > /dev/null`
+            if [ "$?" -ne 0 ]
+            then
+               echo "legit-rm: error: '$file' in index is different to both working file and repository"
+            else
+               echo "legit-rm: error: '$file' has changes staged in the index"
+            fi
+         else
+            echo "legit-rm: error: '$file' is not in the legit repository"           
+         fi
+         exit 1
+      #if file is in repo (tracked)
+      else
+         #if file has changed since recent commit
+         `diff "$file" ".legit/.$recent_commit/$file" > /dev/null`
+         if [ "$?" -ne 0 ]
+         then
+            #if not staged to commit
+            if [ ! -f ".legit/.index/$file" ]
+            then
+               echo "legit-rm: error: '$file' in repository is different to working file" 
+               exit 1
+            fi
+            #else if staged to commit and different to indexed version
+            `diff "$file" ".legit/.index/$file" > /dev/null`
+            if [ "$?" -ne 0 ]
+            then
+               echo "legit-rm: error: '$file' in index is different to both working file and repository"
+            else
+               echo "legit-rm: error: '$file' has changes staged in the index"
+            fi
+            exit 1
+         fi 
+         #else the file is ok to remove
+      fi
+   done
+   #no errors, so remove files
+   for file in $files
+   do
+      [ -f ".legit/.index/$file" ] && { rm ".legit/.index/$file"; }
+      echo "$file" >> ".legit/.deleted"
+      #untrack
+      tracked="`sed "/^$file$/d" .legit/.tracked`"
+      echo "$tracked" > ".legit/.tracked"
+      rm $file
+   done
+}
+#--force --cached
+force_cache() {
+   files=$1
+   recent_commit=$2
+   #check that all files are in the repo
+   for file in $files
+   do
+      if [ ! "$file" = "`cat .legit/.tracked|egrep "^$file$"`" ] && [ ! -f ".legit/.index/$file" ]
+      then
+         echo "legit-rm: error: '$file' is not in the legit repository"
+         exit 1
+      fi
+   done
+   #remove files from repo (untrack them)
+   for file in $files
+   do
+      #if file is staged to commit, clear it from index
+      [ -f ".legit/.index/$file" ] && { rm ".legit/.index/$file"; }
+      tracked="`sed "/^$file$/d" .legit/.tracked`"
+      echo "$tracked" > ".legit/.tracked"
+   done
+}
+#--cache
+rm_cache() {
+   files=$1
+   recent_commit=$2
+   #check for errors
+   for file in $files
+   do
+      #if file is not in repo (untracked)
+      if [ ! "$file" = "`cat .legit/.tracked|egrep "^$file$"`" ]
+      then
+         #if file is staged to commit
+         if [ -f ".legit/.index/$file" ]
+         then 
+            #if file has changed since it was staged to commit
+            #doesn't work
+            `diff "$file" ".legit/.index/$file" > /dev/null`
+            if [ "$?" -ne 0 ]
+            then
+               echo "legit-rm: error: '$file' in index is different to both working file and repository"
+               exit 1
+            #else file is ok to remove
+            else
+               continue
+            fi
+         #file isn't staged to commit
+         fi
+         echo "legit-rm: error: '$file' is not in the legit repository"
+         exit 1
+      #file is in repo
+      else
+         #if file has changed since it was commited and is also staged to commit
+         `diff "$file" ".legit/.$recent_commit/$file" > /dev/null`
+         if [ "$?" -ne 0 ]  && [ -f ".legit/.index/$file" ]
+         then
+            #if file has changed since it was staged to commit
+            `diff "$file" ".legit/.index/$file" > /dev/null`
+            if [ "$?" -ne 0 ]
+            then
+               echo "legit-rm: error: '$file' in index is different to both working file and repository"
+               exit 1
+            fi
+         fi
+            
+      fi
+   done
+   #no errors, so remove files from repo (untrack them)
+   for file in $files
+   do
+      #if file is staged to commit, clear it from index
+      [ -f ".legit/.index/$file" ] && { rm ".legit/.index/$file"; }
+      tracked="`sed "/^$file$/d" .legit/.tracked`"
+      echo "$tracked" > ".legit/.tracked"
+   done
+}
+
+
+##standard legit error checking
+#exit if legit doesn't exist
+if [ ! -d ".legit" ]
+then 
+   echo "legit-rm: error: no .legit directory containing legit repository exists"
+   exit 1
+fi
+#exit if repo is empty
+if [ ! -d ".legit/.0" ]
+then 
+   echo "legit-rm: error: your repository does not have any commits yet"
+   exit 1
+fi
+#check usage errors
+if [ $# -eq 0 ] 
+then
+   echo "usage: legit-rm [--force] [--cached] <filenames>"
+   exit 1 
+elif [ $# -eq 1 ] && [ "$1" = "`echo $1|egrep '^(\-\-force|\-\-cache)$'`" ]
+then
+   echo "usage: legit-rm [--force] [--cached] <filenames>"
+   exit 1
+elif [ $# -eq 2 ] && [ "$1 $2" = "`echo "$1 $2"|egrep '^(--force|--cache) (--force|--cache)$'`" ]
+then 
+   echo "usage: legit-rm [--force] [--cached] <filenames>"
+   exit 1
+fi
+
+
+##set booleans for the options used
+force="1"
+cache="1"
+if [ "$1" = "--force" ] || [ "$2" = "--force" ]
+then
+   force="0"
+fi
+if [ "$1" = "--cached" ] || [ "$2" = "--cached" ]
+then
+   cache="0"
+fi
+
+#extract just file names given at command line
+rm_files="`echo "$*"|sed 's/--force //g'`"
+rm_files="`echo "$rm_files"|sed 's/--cached //g'`"
+
+#check that these files exist
+for file in $rm_files
+do
+   [ ! -f "$file" ] && { echo "legit-rm: error: '$file' is not in the legit repository"; exit 1; }
+done 
+
+#get most recent commit number
+n=-1
+while [ -d ".legit/.$(($n+1))" ]
+do
+   n=$(($n+1))
+done
+
+
+#call the rm functions
+#if no cache option AND file is same as latest commit AND index is same
+#if no cache option
+if [ $cache -eq 1 ] 
+then
+   #if force option used
+   if [ $force -eq 0 ] 
+   then 
+      force_standard "$rm_files" $n
+   else
+      rm_standard "$rm_files" $n
+   fi
+else
+   #if force used
+   if [ $force -eq 0 ] 
+   then 
+      force_cache "$rm_files" $n
+   else
+      rm_cache "$rm_files" $n
+   fi
+fi

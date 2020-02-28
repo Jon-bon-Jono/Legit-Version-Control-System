@@ -1,0 +1,17 @@
+21/06/2019  15:00 15:30    reading       read the spec, took notes, brainstormed
+24/06/2019  17:00 19:00   experiment     experimented with legit, wrote a full plan for subset 0
+30/06/2019  12:30 13:30    coding        coded init, add, log and a non-functional version of commit, wrote a skeleton for show
+02/07/2019  15:00 16:00    coding        coded show and 'finished off' commit
+02/07/2019  19:30 20:30    coding/experiment    discovered bugs in commit (wasn't copying previous commit files into new commit), fixed this
+03/07/2019  09:00 09:30    testing/debugging    tested using autotests, fixed problems with error messages, passed all the autotests
+05/07/2019  19:30 20:00   experiment     experimented with subset 1 programs, wrote part of a plan
+05/07/2019  22:00 23:00   experiment     more experimenting, took notes on all the legit-rm error messages (drew a graph connecting these), noted all legit status'
+09/07/2019  15:00 15:30    coding        coded -a option into commit
+10/07/2019  15:00 16:00    coding        extended commit functionality to write file names to a "tracked" file, wrote code to handle legit-rm usage errors
+12/07/2019  22:00 23:00    coding        started implementing legit-rm so that it can handle standard forced and non-forced, lots of bugs still
+13/07/2019  10:00 11:00    coding        completed standard legit-rm, began on the --cached option. Discovered the index error it is supposed to throw
+13/07/2019  15:30 16:30    coding        completed legit-rm with cached option
+14/07/2019  11:30 13:00    coding        started and completed legit-status, extended rm to write removed filenames into a file called 'deleted'
+14/07/2019  15:00 19:00    testing/debugging    ran subset1 autotest, found lots of bugs, fixed them
+15/07/2019  24:00 04:00    testing/debugging    wrote the 10 tests, found lots of bugs, fixed what I could
+
